@@ -24,7 +24,7 @@ class LinearRegression():
         self.l : float = 1000
         self.costs : list = []
 
-    def fit(self, X: Type[np.ndarray], Y: Type[np.ndarray], l : float = 1000, method : str = "GradientDescent") -> None:
+    def fit(self, X: Type[np.ndarray], Y: Type[np.ndarray], l : float = 0.01, method : str = "GradientDescent") -> None:
         '''
         Fit and train model from given data.
 
@@ -117,7 +117,7 @@ class LinearRegression():
         '''
         Use gradient descent for training
         '''
-        itor = 100000
+        itor = 1000000
         init_lr = 1e-5
         lr = init_lr
         C = 1e-5
