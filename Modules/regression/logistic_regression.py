@@ -54,10 +54,11 @@ class LogisticRegression():
 
     def score(self, X: Type[np.ndarray], Y: Type[np.ndarray]) -> float:
         '''
-        The number of correct class given data
+        Return true classification score
         '''
-        predict = self.predict(X).reshape((Y.shape[0], 1))
-        return np.sum(predict * Y.reshape((Y.size, 1)) + (1 - predict) * (1 - Y.reshape((Y.size, 1)))) / Y.size
+        predict = self.predict(X)
+        error = predict.reshape((predict.size, 1)) == Y.reshape((Y.size, 1))
+        return error[error == True].size / Y.size
 
     def coefficient_(self) -> np.ndarray:
         '''
