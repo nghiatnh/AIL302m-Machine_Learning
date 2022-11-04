@@ -4,13 +4,8 @@ from typing import *
 
 class LogisticRegression():
     '''
-    Linear Regression Model
+    Logistic Regression Model
     ----------
-
-    Ordinary least squares (OLS) Linear Regression.
-    LinearRegression fits a linear model with coefficients w = (w1, ..., wp)
-    to minimize the residual sum of squares between the observed targets in
-    the dataset, and the targets __predicted by the linear approximation.
 
     Parameters
     ----------

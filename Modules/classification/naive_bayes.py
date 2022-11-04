@@ -4,13 +4,8 @@ from typing import *
 
 class MultinomialNB():
     '''
-    Linear Regression Model
+    Multinomial Naive Bayes Model
     ----------
-
-    Ordinary least squares (OLS) Linear Regression.
-    LinearRegression fits a linear model with coefficients w = (w1, ..., wp)
-    to minimize the residual sum of squares between the observed targets in
-    the dataset, and the targets __predicted by the linear approximation.
 
     Parameters
     ----------
@@ -26,12 +21,6 @@ class MultinomialNB():
     def fit(self, X: Type[np.ndarray], Y: Type[np.ndarray]) -> None:
         '''
         Fit and train model from given data.
-
-        Parameter
-        ----------
-
-            - l : regularization coefficient
-            - method : "GradientDescent" or "Equation"
         '''
         self.__parameter(X, Y)
 
@@ -87,13 +76,9 @@ class MultinomialNB():
 
 class BernoulliNB():
     '''
-    Linear Regression Model
+    Bernoulli Naive Bayes Model
     ----------
-
-    Ordinary least squares (OLS) Linear Regression.
-    LinearRegression fits a linear model with coefficients w = (w1, ..., wp)
-    to minimize the residual sum of squares between the observed targets in
-    the dataset, and the targets __predicted by the linear approximation.
+    
 
     Parameters
     ----------
