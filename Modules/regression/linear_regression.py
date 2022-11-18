@@ -1,6 +1,6 @@
 import numpy as np
 from typing import *
-
+from ..utils.metrics import R_square
 
 class LinearRegression():
     '''
@@ -46,9 +46,9 @@ class LinearRegression():
 
     def score(self, X: Type[np.ndarray], Y: Type[np.ndarray]) -> float:
         '''
-        Return Mean Square Error of given data
+        Return R-square of given data
         '''
-        return self.__cost(np.concatenate((np.ones((X.shape[0],1)), X), axis = 1), Y, 0)
+        return R_square(self.predict(X), Y)
 
     def coefficient_(self) -> np.ndarray:
         '''

@@ -1,6 +1,6 @@
 import numpy as np
 from typing import *
-
+from ..utils.metrics import accuracy_score
 
 class LogisticRegression():
     '''
@@ -51,9 +51,8 @@ class LogisticRegression():
         '''
         Return true classification score
         '''
-        predict = self.predict(X)
-        error = predict.reshape((predict.size, 1)) == Y.reshape((Y.size, 1))
-        return error[error == True].size / Y.size
+        
+        return accuracy_score(self.predict(X), Y)
 
     def coefficient_(self) -> np.ndarray:
         '''
