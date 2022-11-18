@@ -14,24 +14,65 @@ def accuracy_score(Y_predict: np.ndarray, Y: np.ndarray) -> float:
     return TF[TF == True].size / Y.size
 
 def f1_score(Y_predict: np.ndarray, Y: np.ndarray, average = 'binary') -> float:
+    '''
+    Calculate f1-score
+
+    @Parameter
+    -----------
+    - Y_predict: predicted values
+    - Y: true values
+    - average: 'binary', 'micro', 'macro'. Default = 'binary'
+    '''
     Pr, Rc, score = precision_recall_f1_score(Y_predict, Y, average)
     return score
 
 def precision_score(Y_predict: np.ndarray, Y: np.ndarray, average = 'binary') -> float:
+    '''
+    Calculate precision score
+
+    @Parameter
+    -----------
+    - Y_predict: predicted values
+    - Y: true values
+    - average: 'binary', 'micro', 'macro'. Default = 'binary'
+    '''
     Pr, Rc, score = precision_recall_f1_score(Y_predict, Y, average)
     return Pr
 
 def recall_score(Y_predict: np.ndarray, Y: np.ndarray, average = 'binary') -> float:
+    '''
+    Calculate recall score
+
+    @Parameter
+    -----------
+    - Y_predict: predicted values
+    - Y: true values
+    - average: 'binary', 'micro', 'macro'. Default = 'binary'
+    '''
     Pr, Rc, score = precision_recall_f1_score(Y_predict, Y, average)
     return Rc
 
-def precision_recall_f1_score(Y_predict: np.ndarray, Y: np.ndarray, average = 'binary') -> float:
+def precision_recall_f1_score(Y_predict: np.ndarray, Y: np.ndarray, average = 'binary') -> Tuple[float]:
+    '''
+    Calculate precision, recall and f1-score
 
+    @Parameter
+    -----------
+    - Y_predict: predicted values
+    - Y: true values
+    - average: 'binary', 'micro', 'macro'. Default = 'binary'
+
+    @Return 
+    -----------
+    precision, recall, f1-score
+    '''
     Y = Y.reshape(Y.size, 1)
     Y_predict = Y_predict.reshape(Y_predict.size, 1)
 
     check_same_shape(Y_predict, Y)
 
+    # precision = (TP1 + TP2 + .... + TPn) / (TP1 + TP2 + ... + TPn + FP1 + FP2 + ... + FPn)
+    # recall = (TP1 + TP2 + .... + TPn) / (TP1 + TP2 + ... + TPn + FN1 + FN2 + ... + FNn)
     if average == 'micro':
         TP_sum = 0
         FP_sum = 0
@@ -50,6 +91,8 @@ def precision_recall_f1_score(Y_predict: np.ndarray, Y: np.ndarray, average = 'b
         Pr = TP_sum / (TP_sum + FP_sum)
         Rc = TP_sum / (TP_sum + FN_sum)
         
+    # precision = (Pr1 + Pr2 + ... + Prn) / (number of classes)
+    # recall = (Rc1 + Rc2 + ... + Rcn) / (number of classes)
     elif average == 'macro':
         PR = []
         RC = []
@@ -70,6 +113,8 @@ def precision_recall_f1_score(Y_predict: np.ndarray, Y: np.ndarray, average = 'b
         Pr = np.sum(PR) / np.unique(Y).size
         Rc = np.sum(RC) / np.unique(Y).size
 
+    # precision = TP / (TP + FP)
+    # recall = TP / (TP + FN)
     else:
         TP = Y_predict[Y_predict == 1][Y[Y_predict == 1] == 1].size
         if TP == 0:
@@ -79,6 +124,7 @@ def precision_recall_f1_score(Y_predict: np.ndarray, Y: np.ndarray, average = 'b
         Pr = TP / (TP + FP)
         Rc = TP / (TP + FN)
 
+    # f1-score = 2 * precision * recall / (precision + recall)
     score = 2 * Pr * Rc / (Pr + Rc)
 
     return Pr, Rc, score
@@ -97,5 +143,8 @@ def R_square(Y_predict: np.ndarray, Y: np.ndarray) -> float:
 
 
 def check_same_shape(Y_predict: np.ndarray, Y: np.ndarray):
+    '''
+    Check if predict and true value have same shape
+    '''
     if Y.shape != Y_predict.shape:
         raise Exception('Y and Y_predict must be same shape')
