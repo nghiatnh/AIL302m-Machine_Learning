@@ -11,11 +11,9 @@ class DecisionNode():
                  children: List[DecisionNode] = [],
                  entropy: float = 0.0,
                  depth: int = 0,
-                 check_attribute: str | int = None,
                  split_attribute: str | int = None,
                  values_order: List[str | int] = None,
                  rule: str = None,
-                 check_value: str | int = None,
                  label: str | int = None
                  ) -> None:
         '''
