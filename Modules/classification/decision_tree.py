@@ -7,6 +7,44 @@ import numbers
 
 
 class DecisionNode():
+    '''
+    Decision Node
+    ------------
+
+    The node for building a decision tree
+
+    Parameter
+    ----------
+
+    ids: List[int], default = None
+        List indexes of train data in this node
+
+    children: List[DecisionNode], default = []
+        Spitted children of this node
+
+    entropy: float, default = 0
+        Entropy of this node for further calculations, will fill later
+
+    depth: int, default 0
+        Distance from this node to root. The node with depth = 0 is root of the decision tree
+
+    split_attribute: str | int, default = None
+        Attribute using for split node
+
+    value_order: List[str | int], default = None
+        All possible values for splitting of child node
+
+    label: str | int, default = None
+        Label of node if it is a leaf node
+
+    rule: {"==", "<=", ">"}, default = "=="
+        The rule to compare check attribute and check value. E.g: "Overlook == sunny" or "X[2] <= 5"
+
+        - If attribute type is ``'categorical'``, rule always "=="
+        - If attribute type is ``'continuous'``, rule can be "<=" or ">"
+
+    '''
+
     def __init__(self, *, ids: List[int] = None,
                  children: List[DecisionNode] = [],
                  entropy: float = 0.0,
@@ -16,43 +54,6 @@ class DecisionNode():
                  rule: str = None,
                  label: str | int = None
                  ) -> None:
-        '''
-        Decision Node
-        ------------
-
-        The node for building a decision tree
-
-        Parameter
-        ----------
-
-        ids: List[int], default = None
-            List indexes of train data in this node
-
-        children: List[DecisionNode], default = []
-            Spitted children of this node
-
-        entropy: float, default = 0
-            Entropy of this node for further calculations, will fill later
-
-        depth: int, default 0
-            Distance from this node to root. The node with depth = 0 is root of the decision tree
-
-        split_attribute: str | int, default = None
-            Attribute using for split node
-
-        value_order: List[str | int], default = None
-            All possible values for splitting of child node
-
-        label: str | int, default = None
-            Label of node if it is a leaf node
-
-        rule: {"==", "<=", ">"}, default = "=="
-            The rule to compare check attribute and check value. E.g: "Overlook == sunny" or "X[2] <= 5"
-
-            - If attribute type is categorical, rule always "=="
-            - If attribute type is continuous, rule can be "<=" or ">"
-
-        '''
         self.ids: List[int] = ids
         self.entropy: float = entropy
         self.depth: int = depth
@@ -96,42 +97,43 @@ class DecisionNode():
 
 
 class DecisionTreeClassifier():
+    '''
+    Decision Tree Classifier
+    -----------
+
+    Decision tree for classification problems using ID3 algorithm
+
+    Parameter
+    -----------
+
+    max_depth: int, default = 10
+        The maximum depth of tree
+
+    min_samples_split: int, default = 2
+        The minimum number of samples required to split an internal node
+
+    min_gain: float, default = 1e-4
+        The minimum of information gain after each split step
+
+    attributes_name: List[str | int], default = None
+        The list of attributes name for printing:
+
+        - If None, then print like X[i] for attributes name
+        - If not None, then print like "Overlook == sunny"
+
+    attribute_type: {"categorical", "continuous"}, default = "categorical"
+        The type for split a node base on its attribute
+
+        - If ``'categorical'``, then use "==" for all values of variable X
+        - If ``'continuous'``, then use "<=" and ">" for only split value of variable x
+
+    '''
     def __init__(self, *, max_depth: int = 10,
                  min_samples_split: int = 2,
                  min_gain: float = 1e-4, attributes_name: List[str | int] | None = None,
                  attribute_type: Literal["categorical",
                                          "continuous"] = 'categorical'
                  ) -> None:
-        '''
-        Decision Tree Classifier
-        -----------
-
-        Decision tree for classification problems using ID3 algorithm
-
-        Parameter
-        -----------
-
-        max_depth: int, default = 10
-            The maximum depth of tree
-
-        min_samples_split: int, default = 2
-            The minimum number of samples required to split an internal node
-
-        min_gain: float, default 1e-4
-            The minimum of information gain after each split step
-
-        attributes_name: List[str | int], default = None
-            The list of attributes name for printing:
-
-            - If None, then print like X[i] for attributes name
-            - If not None, then print like "Overlook == sunny"
-
-        attribute_type: {"categorical", "continuous"}, default = "categorical"
-            The type for split a node base on its attribute
-
-            - If categorical, then use "==" for all values of variable X
-            - If continuous, then use "<=" and ">" for only split value of variable x
-        '''
         self.root: DecisionNode = None
         self.max_depth: int = max_depth
         self.min_samples_split: int = min_samples_split
