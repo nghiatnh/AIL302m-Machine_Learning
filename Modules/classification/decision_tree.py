@@ -227,7 +227,7 @@ class DecisionTreeClassifier():
         rules = ["<=", ">"]
         check_att = (f"X[{check_attribute}]" if not self.attributes_name else self.attributes_name[check_attribute]
                     ) if not check_attribute is None else None
-        print(f"check att {check_att}")
+
         if check_att is None:
             return None
 
