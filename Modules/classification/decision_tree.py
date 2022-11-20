@@ -3,6 +3,7 @@ import numpy as np
 from typing import *
 from collections import Counter
 from ..utils.metrics import entropy, accuracy_score
+import numbers
 
 
 class DecisionNode():
@@ -13,7 +14,7 @@ class DecisionNode():
                  check_attribute: str | int = None,
                  split_attribute: str | int = None,
                  values_order: List[str | int] = None,
-                 rule: str = '==',
+                 rule: str = None,
                  check_value: str | int = None,
                  label: str | int = None
                  ) -> None:
@@ -47,14 +48,11 @@ class DecisionNode():
         label: str | int, default = None
             Label of node if it is a leaf node
 
-        check_attribute: str | int, default = None
-            Split attribute of parent node, using for printing
-
         rule: {"==", "<=", ">"}, default = "=="
-            The rule to compare check attribute and check value
+            The rule to compare check attribute and check value. E.g: "Overlook == sunny" or "X[2] <= 5"
 
-        check_value: str | int: default = None
-            The value that give this node splitted, using for printing
+            - If attribute type is categorical, rule always "=="
+            - If attribute type is continuous, rule can be "<=" or ">"
 
         '''
         self.ids: List[int] = ids
@@ -62,8 +60,6 @@ class DecisionNode():
         self.depth: int = depth
         self.children: List[DecisionNode] = children
 
-        self.check_attribute: str | int = check_attribute
-        self.check_value: str | int = check_value
         self.rule: str = rule
 
         self.split_attribute: str | int = split_attribute
@@ -92,15 +88,11 @@ class DecisionNode():
         print("    " * self.depth + "|depth: {}".format(self.depth))
         print("    " * self.depth + "|ids: {}".format(self.ids))
         print("    " * self.depth + "|entropy: {}".format(self.entropy))
-        print("    " * self.depth + "|label: {}".format(self.label))
         att = (f"X[{self.split_attribute}]" if not attributes_name else attributes_name[self.split_attribute]
                ) if not self.split_attribute is None else None
         print("    " * self.depth + "|split attribute: {}".format(att))
-        check_att = (f"X[{self.check_attribute}]" if not attributes_name else attributes_name[self.check_attribute]
-                     ) if not self.check_attribute is None else None
-        if not check_att is None:
-            print("    " * self.depth + "|node rule: {} {} {}".format(check_att,
-                  self.rule, self.check_value))
+        print("    " * self.depth + "|node rule: {}".format(self.rule))
+        print("    " * self.depth + "|label: {}".format(self.label))
         for child in self.children:
             child.print(attributes_name)
 
@@ -154,6 +146,10 @@ class DecisionTreeClassifier():
         '''
         Fit and train model from given data.
         '''
+        if self.attribute_type == 'categorical':
+            if not np.all((isinstance(X[i,j], numbers.Number) for i in range(X.shape[0]) for j in range(X.shape[1]))):
+                raise Exception("continuous only for numeric array")
+
         self.N = Y.size
         self.X: np.ndarray = X
         self.attributes: List[int] = [x for x in range(X.shape[1])]
@@ -227,6 +223,19 @@ class DecisionTreeClassifier():
         node.set_label(Counter(self.Y[node.ids]).most_common()[
                        0][0])  # most frequent label
 
+    def __make_rule(self, check_attribute: str | int, values_order: List[str | int], i: int):
+        rules = ["<=", ">"]
+        check_att = (f"X[{check_attribute}]" if not self.attributes_name else self.attributes_name[check_attribute]
+                    ) if not check_attribute is None else None
+        print(f"check att {check_att}")
+        if check_att is None:
+            return None
+
+        rule = "==" if self.attribute_type == "categorical" else rules[i]
+        check_value = values_order[i] if self.attribute_type == 'categorical' else values_order[0]
+
+        return f"{check_att} {rule} {check_value}"
+
     def __categorical(self, ids: List[int], sub_data: np.ndarray, att: str | int, values: List[str | int]) -> Tuple[List[int], List[int]]:
         '''
         Split for categorical option
@@ -298,11 +307,8 @@ class DecisionTreeClassifier():
 
         node.set_properties(best_attribute, values_order)
 
-        rule = ["<=", ">"]
         child_nodes = [DecisionNode(ids=split_id,
                                     entropy=self.__entropy(split_id), depth=node.depth + 1,
-                                    rule="==" if self.attribute_type == 'categorical' else rule[i],
-                                    check_value=values_order[i] if self.attribute_type == 'categorical' else values_order[0],
-                                    check_attribute=node.split_attribute)
+                                    rule=self.__make_rule(node.split_attribute, values_order, i))
                        for i, split_id in enumerate(best_splits)]
         return child_nodes
