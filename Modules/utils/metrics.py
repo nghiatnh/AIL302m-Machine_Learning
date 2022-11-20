@@ -148,3 +148,11 @@ def check_same_shape(Y_predict: np.ndarray, Y: np.ndarray):
     '''
     if Y.shape != Y_predict.shape:
         raise Exception('Y and Y_predict must be same shape')
+
+def entropy(X: np.ndarray) -> np.ndarray:
+    '''
+    Calculate entropy loss of X
+    '''
+    X_remove0 = X[X.nonzero()[0]]
+    p = X_remove0/float(np.sum(X_remove0))
+    return -np.sum(p * np.log(p))
