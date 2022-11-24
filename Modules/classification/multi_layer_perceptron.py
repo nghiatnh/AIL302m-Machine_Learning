@@ -3,6 +3,7 @@ import numpy as np
 from typing import *
 from scipy import sparse
 from ..utils.metrics import accuracy_score
+import math
 
 
 class MultilayerPerceptron():
@@ -23,6 +24,7 @@ class MultilayerPerceptron():
                         solver: Literal['gd'] = 'gd',
                         validation_fraction: float = 0.1,
                         early_stopping: bool = False,
+                        show_loss: bool = True,
                         max_iter: int = 200,
                         batch_size: Literal['auto'] | int = 'auto'
                 ) -> None:
@@ -35,6 +37,7 @@ class MultilayerPerceptron():
         self.__solver = solver
         self.__validation_fraction = validation_fraction
         self.__early_stopping = early_stopping
+        self.__show_loss = show_loss
         self.__max_iter = max_iter
         self.__batch_size = batch_size
 
@@ -83,11 +86,13 @@ class MultilayerPerceptron():
         '''
         Concatenate ones column to X data
         '''
-        self.__N_train = min(X.shape[0], Y.shape[0])
-        self.__labels = np.unique(Y[:self.__N_train])
-        self.__X = X[:self.__N_train]
-        self.__Y = self.__convert_labels(Y[:self.__N_train], self.__labels.size)
+        self.N_train_ = min(X.shape[0], Y.shape[0])
+        self.__labels = np.unique(Y[:self.N_train_])
+        self.__X = X[:self.N_train_]
+        self.__Y = self.__convert_labels(Y[:self.N_train_], self.__labels.size)
         self.__layer_sizes = (self.__X.shape[1],) + self.__hidden_layer_sizes + (self.__labels.size,)
+        if self.__batch_size == 'auto':
+            self.__batch_size = min(200, self.N_train_)
 
     def __convert_labels(self, y: np.ndarray, C: int) -> np.ndarray:
         '''
@@ -148,20 +153,28 @@ class MultilayerPerceptron():
                       for i in range(self.__L)]
         b = [None] + [np.zeros((1, self.__layer_sizes[i+1])) for i in range(self.__L)]
         
+        num_iter = math.ceil(self.N_train_ / self.__batch_size)
+        print(num_iter)
+
         for i in range(self.__max_iter):
+
+            for k in range(num_iter):
+                X_ = X[k * self.__batch_size: (k + 1) * self.__batch_size,:]
+                Y_ = Y[k * self.__batch_size: (k + 1) * self.__batch_size,:]
+                (Z, A, Y_predict) = self.__forward(X_, W, b)
+
+                (dW, db) = self.__backward(X, Y_, Y_predict, W, A, Z)
+
+                # Gradient Descent update
+                for j in range(1, self.__L + 1):
+                    W[j] += -self.__lr * dW[j]
+                    b[j] += -self.__lr * db[j]
+
             (Z, A, Y_predict) = self.__forward(X, W, b)
-
-            (dW, db) = self.__backward(X, Y, Y_predict, W, A, Z)
-
-            # Gradient Descent update
-            for j in range(1, self.__L + 1):
-                W[j] += -self.__lr * dW[j]
-                b[j] += -self.__lr * db[j]
-
             if (i + 1) % 1000 == 0:
                 loss = self.__cost(Y, Y_predict)
                 self.loss_curve_.append(loss)
-                print("iter %d, loss: %f" % (i+1, loss))
+                if self.__show_loss: print("epoch %d, loss: %f" % (i+1, loss))
                 if len(self.loss_curve_) >= 2 and abs(self.loss_curve_[-1] - self.loss_curve_[-2]) <= self.__tol:
                     break
 
