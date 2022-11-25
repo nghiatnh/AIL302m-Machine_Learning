@@ -3,6 +3,8 @@ import numpy as np
 from typing import *
 from scipy import sparse
 from ..utils.metrics import accuracy_score
+from ..utils.model_selection import train_test_split
+from ..utils.matrix_functions import *
 import math
 
 
@@ -26,7 +28,8 @@ class MultilayerPerceptron():
                         early_stopping: bool = False,
                         show_loss: bool = True,
                         max_iter: int = 200,
-                        batch_size: Literal['auto'] | int = 'auto'
+                        batch_size: Literal['auto'] | int = 'auto',
+                        n_iter_no_change: int = 10,
                 ) -> None:
         self.__hidden_layer_sizes = hidden_layer_sizes
         self.__activation: Literal['identity',
@@ -40,16 +43,40 @@ class MultilayerPerceptron():
         self.__show_loss = show_loss
         self.__max_iter = max_iter
         self.__batch_size = batch_size
+        self.__n_iter_no_change = n_iter_no_change
 
         self.__L = len(self.__hidden_layer_sizes) + 1
         self.__layer_sizes = self.__hidden_layer_sizes
         self.__labels: np.ndarray = None
         self.__X: np.ndarray = None
         self.__Y: np.ndarray = None
+        self.__X_val: np.ndarray = None
+        self.__Y_val: np.ndarray = None
+        self.__activations = {
+            "relu" : {
+                "function": relu,
+                "gradient": relu_grad
+            },
+            "logistic" : {
+                "function": sigmoid,
+                "gradient": sigmoid_grad
+            },
+            "identity" : {
+                "function": identity,
+                "gradient": identity_grad
+            },
+            "tanh" : {
+                "function": tanh,
+                "gradient": tanh_grad
+            }
+        }
+        self.__activate_function = self.__activations[self.__activation]
+        self.__val_loss_curve: list = []
+        self.__val_score: list = []
         
         self.N_train_: int = 0
-        self.loss_: float = -1
-        self.best_loss_: float = -1
+        self.N_val_: int = 0
+        self.best_loss_: float = np.inf
         self.coefs_: List[np.ndarray]
         self.intercepts_: List[np.ndarray]
         self.loss_curve_: list = []
@@ -79,7 +106,6 @@ class MultilayerPerceptron():
         '''
         Return true classification score
         '''
-        pass
         return accuracy_score(self.predict(X), Y)
 
     def __parameter(self, X: np.ndarray, Y: np.ndarray) -> None:
@@ -90,6 +116,9 @@ class MultilayerPerceptron():
         self.__labels = np.unique(Y[:self.N_train_])
         self.__X = X[:self.N_train_]
         self.__Y = self.__convert_labels(Y[:self.N_train_], self.__labels.size)
+        if self.__early_stopping:
+            self.__X, self.__X_val, self.__Y, self.__Y_val = train_test_split(self.__X, self.__Y, test_size=self.__validation_fraction)
+
         self.__layer_sizes = (self.__X.shape[1],) + self.__hidden_layer_sizes + (self.__labels.size,)
         if self.__batch_size == 'auto':
             self.__batch_size = min(200, self.N_train_)
@@ -98,23 +127,17 @@ class MultilayerPerceptron():
         '''
         Convert labels to one-hot encoding
         '''
-        print(y.shape)
         Y = sparse.coo_matrix((np.ones_like(y),
             (np.arange(len(y)), y)), shape = (len(y), C)).toarray()
 
         return Y
 
-    def __softmax(self, V):
-        e_V = np.exp(V - np.max(V, axis=1, keepdims=True))
-        Z = e_V / e_V.sum(axis=1, keepdims=True)
-        return Z
-
-    def __cost(self, Y: Type[np.ndarray], Y_predict: Type[np.ndarray]) -> np.ndarray:
+    def __cost(self, Y: Type[np.ndarray], Y_predict: Type[np.ndarray], W: List[np.ndarray]) -> np.ndarray:
         '''
         Return cost values of X, Y
         '''
         N = Y.shape[0]
-        return -np.sum(Y*np.log(Y_predict)) / N
+        return -np.sum(Y*np.log(Y_predict)) / N + self.__alpha * np.sum(np.linalg.norm(w) for w in W)
 
     def __forward(self, X: np.ndarray, W: np.ndarray, b: np.ndarray) -> Tuple[List[np.ndarray], List[np.ndarray], np.ndarray]:
         A = [None for i in range(self.__L + 1)]
@@ -124,9 +147,9 @@ class MultilayerPerceptron():
             Z[i] = np.dot(A[i-1], W[i]) + b[i]
 
             # Relu function
-            A[i] = np.maximum(Z[i], 0)
+            A[i] = self.__activate_function["function"](Z[i])
 
-        Y_predict = self.__softmax(Z[self.__L])
+        Y_predict = softmax(Z[self.__L])
         return (Z, A, Y_predict)
 
     def __backward(self, X: np.ndarray, Y: np.ndarray, Y_predict: np.ndarray, W: np.ndarray, A: np.ndarray, Z: np.ndarray) -> Tuple[List[np.ndarray], List[np.ndarray]]:
@@ -136,12 +159,11 @@ class MultilayerPerceptron():
         Ei_1 = (Y_predict - Y) / N
         for i in range(self.__L, 0, -1):
             Ei = Ei_1
-            dW[i] = np.dot(A[i-1].T, Ei)
+            dW[i] = np.dot(A[i-1].T, Ei) + self.__alpha * W[i]
             db[i] = np.sum(Ei, axis=0, keepdims=True)
             if i == 1:
                 continue
-            Ei_1 = np.dot(Ei, W[i].T)
-            Ei_1[Z[i-1] <= 0] = 0  # gradient of ReLU
+            Ei_1 = np.dot(Ei, W[i].T) * self.__activate_function["gradient"](Z[i-1])
 
         return (dW, db)
 
@@ -154,7 +176,7 @@ class MultilayerPerceptron():
         b = [None] + [np.zeros((1, self.__layer_sizes[i+1])) for i in range(self.__L)]
         
         num_iter = math.ceil(self.N_train_ / self.__batch_size)
-        print(num_iter)
+        same_count = 1
 
         for i in range(self.__max_iter):
 
@@ -172,11 +194,36 @@ class MultilayerPerceptron():
 
             (Z, A, Y_predict) = self.__forward(X, W, b)
             if (i + 1) % 1000 == 0:
-                loss = self.__cost(Y, Y_predict)
+                loss = self.__cost(Y, Y_predict, W[1:])
                 self.loss_curve_.append(loss)
-                if self.__show_loss: print("epoch %d, loss: %f" % (i+1, loss))
-                if len(self.loss_curve_) >= 2 and abs(self.loss_curve_[-1] - self.loss_curve_[-2]) <= self.__tol:
+                if self.__early_stopping:
+                    (Z, A, Y_predict) = self.__forward(self.__X_val, W, b)
+                    val_loss = self.__cost(self.__Y_val, Y_predict, W[1:])
+                    self.best_loss_ = min(val_loss, self.best_loss_)
+                    val_score = accuracy_score(np.argmax(Y_predict, axis=1), np.argmax(self.__Y_val, axis=1))
+                    self.__val_loss_curve.append(val_loss)
+                    self.__val_score.append(val_score)
+
+                    if len(self.__val_loss_curve) >= 2:
+                        if abs(self.__val_loss_curve[-1] - self.__val_loss_curve[-2]) <= self.__tol or abs(self.__val_score[-1] - self.__val_score[-2]) <= self.__tol:
+                            same_count += 1
+                        else:
+                            same_count = 1
+                
+                if self.__show_loss: 
+                    print('')
+                    if self.__early_stopping:
+                        print("epoch %d, train loss: %f, validation loss: %f, validation accuracy: %f" % (i+1, loss, val_loss, val_score))
+                    else:
+                        print("epoch %d, loss: %f" % (i+1, loss))
+                        
+                if same_count >= self.__n_iter_no_change:
                     break
+            
+            rate = (((i + 1) % 1000) / 1000)
+            length = int(rate * 50) + 1
+            bar = '█' * length + '-' * (50 - length)
+            print(f'\repoch {i+1}:\t|{bar}|\t{int(rate * 100) + 1}%', end='\r')
 
         self.coefs_ = W
         self.intercepts_ = b
