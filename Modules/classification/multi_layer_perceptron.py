@@ -133,7 +133,7 @@ class MultilayerPerceptron():
                  solver: Literal['lbfgs', 'sgd', 'adam'] = 'adam',
                  validation_fraction: float = 0.1,
                  early_stopping: bool = False,
-                 verbose: bool = True,
+                 verbose: bool = False,
                  max_iter: int = 200,
                  batch_size: Literal['auto'] | int = 'auto',
                  n_iter_no_change: int = 10,
