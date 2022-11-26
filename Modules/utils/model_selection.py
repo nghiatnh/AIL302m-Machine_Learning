@@ -5,7 +5,7 @@ def train_test_split(X: np.ndarray, Y: np.ndarray, test_size: float = 0.2, train
     N = X.shape[0]
     indexes = np.arange(N)
     if shuffle:
-        indexes = np.random.shuffle(indexes)
+        np.random.shuffle(indexes)
 
     if train_size == None and test_size == None:
         raise Exception('train_size or test_size must be not None')
