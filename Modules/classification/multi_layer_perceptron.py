@@ -11,14 +11,118 @@ import math
 
 class MultilayerPerceptron():
     '''
-    Logistic Regression Model
-    ----------
+    This model optimizes the log-loss function using LBFGS or stochastic gradient descent.
 
     Parameters
     ----------
+    - hidden_layer_sizes : tuple, length = n_layers - 2, default=(100,)
+        The ith element represents the number of neurons in the ith
+        hidden layer.
 
+    - activation : {'identity', 'logistic', 'tanh', 'relu'}, default='relu'
+        Activation function for the hidden layer.
+        - 'identity', no-op activation, useful to implement linear bottleneck,
+        returns f(x) = x
+        - 'logistic', the logistic sigmoid function,
+        returns f(x) = 1 / (1 + exp(-x)).
+        - 'tanh', the hyperbolic tan function,
+        returns f(x) = tanh(x).
+        - 'relu', the rectified linear unit function,
+        returns f(x) = max(0, x)
+
+    - solver : {'lbfgs', 'sgd', 'adam'}, default='adam'
+        The solver for weight optimization.
+        - 'lbfgs' is an optimizer in the family of quasi-Newton methods.
+        - 'sgd' refers to stochastic gradient descent.
+        - 'adam' refers to a stochastic gradient-based optimizer proposed by Kingma, Diederik, and Jimmy Ba
+
+    - alpha : float, default=1e-4
+        Strength of the L2 regularization term. The L2 regularization term
+        is divided by the sample size when added to the loss.
+
+    - batch_size : int, default='auto'
+        Size of minibatches for stochastic optimizers.
+
+        If the solver is 'lbfgs', the classifier will not use minibatch.
+
+        When set to "auto", `batch_size=min(200, n_samples)`.
+
+    - learning_rate : float, default=0.001
+        The initial learning rate used. It controls the step-size
+        in updating the weights. Only used when solver='sgd' or 'adam'.
+
+    - max_iter : int, default=200
+        Maximum number of iterations. The solver iterates until convergence
+        (determined by 'tol') or this number of iterations. For stochastic
+        solvers ('sgd', 'adam'), note that this determines the number of epochs
+        (how many times each data point will be used), not the number of
+        gradient steps.
+
+    - shuffle : bool, default=True
+        Whether to shuffle samples in each iteration. Only used when
+        solver='sgd' or 'adam'.
+
+    - tol : float, default=1e-4
+        Tolerance for the optimization. When the loss or score is not improving
+        by at least ``tol`` for ``n_iter_no_change`` consecutive iterations,
+        unless ``learning_rate`` is set to 'adaptive', convergence is
+        considered to be reached and training stops.
+
+    - verbose : bool, default=False
+        Whether to print progress messages to stdout.
+
+    - early_stopping : bool, default=False
+        Whether to use early stopping to terminate training when validation
+        score is not improving. If set to true, it will automatically set
+        aside 10% of training data as validation and terminate training when
+        validation score is not improving by at least tol for
+        ``n_iter_no_change`` consecutive epochs. The split is stratified,
+        except in a multilabel setting.
+        
+        If early stopping is False, then the training stops when the training
+        loss does not improve by more than tol for n_iter_no_change consecutive
+        passes over the training set.
+
+        Only effective when solver='sgd' or 'adam'.
+
+    - validation_fraction : float, default=0.1
+        The proportion of training data to set aside as validation set for
+        early stopping. Must be between 0 and 1.
+        Only used if early_stopping is True.
+    
+    - beta_1 : float, default=0.9
+        Exponential decay rate for estimates of first moment vector in adam,
+        should be in [0, 1). Only used when solver='adam'.
+    
+    - beta_2 : float, default=0.999
+        Exponential decay rate for estimates of second moment vector in adam,
+        should be in [0, 1). Only used when solver='adam'.
+    
+    - epsilon : float, default=1e-8
+        Value for numerical stability in adam. Only used when solver='adam'.
+    
+    - n_iter_no_change : int, default=10
+        Maximum number of epochs to not meet ``tol`` improvement.
+
+        Only effective when solver='sgd' or 'adam'.
+    
+    - n_iter_check_loss : int, default='auto'
+        The number of epoch for checking training loss.
+
+        If the value is ``auto``, `n_iter_check_loss=max(10**(len(str(self.__max_iter)) - 3), 1)`
+    
+    Examples
+    --------
+
+    >>> from sklearn.datasets import make_classification
+    >>> from sklearn.model_selection import train_test_split
+    >>> X, y = make_classification(n_samples=100, random_state=1)
+    >>> X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+    >>> clf = MultilayerPerceptron(max_iter=3000)
+    >>> clf.fit(X_train, y_train)
+    >>> clf.score(X_test, y_test)
+    0.85...
     '''
-
     def __init__(self, hidden_layer_sizes: tuple = (100, ),
                  activation: Literal['identity',
                                      'logistic', 'tanh', 'relu'] = 'relu',
@@ -99,12 +203,6 @@ class MultilayerPerceptron():
     def fit(self, X: np.ndarray, Y: np.ndarray) -> None:
         '''
         Fit and train model from given data.
-
-        Parameter
-        ----------
-
-            - l : regularization coefficient
-            - method : "GradientDescent" or "StochasticGradientDescent"
         '''
         self.__parameter(X, Y)
 
@@ -125,7 +223,7 @@ class MultilayerPerceptron():
 
     def __parameter(self, X: np.ndarray, Y: np.ndarray) -> None:
         '''
-        Concatenate ones column to X data
+        Reset some parameters
         '''
         self.N_train_ = min(X.shape[0], Y.shape[0])
         self.__labels = np.unique(Y[:self.N_train_])
@@ -135,7 +233,7 @@ class MultilayerPerceptron():
         self.__layer_sizes = (
             self.__X.shape[1],) + self.__hidden_layer_sizes + (self.__labels.size,)
         if self.__batch_size == 'auto':
-            self.__batch_size = min(200, int(self.N_train_ * self.__validation_fraction))
+            self.__batch_size = min(200, int(self.N_train_ * (1 - self.__validation_fraction)))
 
     def __convert_labels(self, y: np.ndarray, C: int) -> np.ndarray:
         '''
@@ -148,13 +246,16 @@ class MultilayerPerceptron():
 
     def __cost(self, Y: Type[np.ndarray], Y_predict: Type[np.ndarray], W: List[np.ndarray]) -> np.ndarray:
         '''
-        Return cost values of X, Y
+        Return cost values of X, Y and W (for regularization)
         '''
         N = Y.shape[0]
         indexes = Y_predict != 0
-        return -np.sum(Y[indexes]*np.log(Y_predict[indexes])) / N + self.__alpha * np.sum(np.linalg.norm(w) for w in W)
+        return -np.sum(Y[indexes]*np.log(Y_predict[indexes])) / N + self.__alpha * np.sum(np.linalg.norm(w) for w in W) / N
 
     def __forward(self, X: np.ndarray, W: np.ndarray, b: np.ndarray) -> Tuple[List[np.ndarray], List[np.ndarray], np.ndarray]:
+        '''
+        Forward propagation in multilayer perceptron model
+        '''
         A = [None for i in range(self.__L + 1)]
         Z = [None for i in range(self.__L + 1)]
         A[0] = X
@@ -168,6 +269,9 @@ class MultilayerPerceptron():
         return (Z, A, Y_predict)
 
     def __backward(self, X: np.ndarray, Y: np.ndarray, Y_predict: np.ndarray, W: np.ndarray, A: np.ndarray, Z: np.ndarray) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        '''
+        Forward propagation in multilayer perceptron model
+        '''
         N = X.shape[1]
         dW = [None for i in range(self.__L + 1)]
         db = [None for i in range(self.__L + 1)]
@@ -185,7 +289,7 @@ class MultilayerPerceptron():
 
     def __sgd(self, X: np.ndarray, Y: np.ndarray) -> None:
         '''
-        Use gradient descent for training
+        Use stochastic gradient descent for training
         '''
         W = [None] + [np.random.randn(self.__layer_sizes[i], self.__layer_sizes[i+1])
                       for i in range(self.__L)]
@@ -318,9 +422,9 @@ class MultilayerPerceptron():
 
         Example
         ----------
-        >>> self.__print_train_progress(i, X, Y, X_val, Y_val, W, b, same_count, min(1000, self.__max_iter))
-        # epoch 9000:	|██████████████████████████████████████████████████|	100%
-        # epoch 9000, train loss: 0.0490555408805367
+        >>> self.__print_train_progress(i, X, Y, X_val, Y_val, W, b, same_count)
+        epoch 9000:	|██████████████████████████████████████████████████|	100%
+        epoch 9000, train loss: 0.0490555408805367
         '''
         epoch_rate = self.__n_iter_check_loss
         if (epoch + 1) % epoch_rate == 0:
